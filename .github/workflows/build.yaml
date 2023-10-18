@@ -1,0 +1,32 @@
+name: "Build and push"
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+
+jobs:
+  lint:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "emortalmc/actions/go/lint@main"
+
+  publish:
+    needs: "lint"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "emortalmc/actions/go/publish-single@main"
+        with:
+          registry-password: "${{ secrets.GITHUB_TOKEN }}"
+
+# TODO: Uncomment when ready for deployment
+#  deploy:
+#    needs: "publish"
+#    runs-on: "ubuntu-latest"
+#    if: "github.ref == 'refs/heads/main'"
+#    steps:
+#      - uses: "emortalmc/actions/argo-sync@main"
+#        with:
+#          deployment-name: "leaderboard-service"
+#          values-path: "service/values/leaderboard-service.yaml"
+#          deployments-repo-token: "${{ secrets.DEPLOYMENTS_REPO_TOKEN }}"
