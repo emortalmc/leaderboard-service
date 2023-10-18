@@ -5,9 +5,7 @@ import (
 	"fmt"
 	pb "github.com/emortalmc/proto-specs/gen/go/model/leaderboard"
 	"github.com/redis/rueidis"
-	"go.uber.org/zap"
 	"leaderboard-service/internal/config"
-	"strconv"
 	"sync"
 )
 
@@ -27,7 +25,7 @@ type redisImpl struct {
 	client rueidis.Client
 }
 
-func NewRedis(ctx context.Context, wg *sync.WaitGroup, cfg *config.RedisConfig, logger *zap.SugaredLogger) (Redis, error) {
+func NewRedis(ctx context.Context, wg *sync.WaitGroup, cfg *config.RedisConfig) (Redis, error) {
 	client, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)}})
 	if err != nil {
 		return nil, err
@@ -60,7 +58,7 @@ func (r *redisImpl) DeleteEntry(ctx context.Context, leaderboardId string, entry
 }
 
 func (r *redisImpl) GetEntriesInRange(ctx context.Context, leaderboardId string, sortOrder pb.SortOrder, startRank uint32, endRank uint32) ([]string, error) {
-	cmdBuilder := r.client.B().Zrange().Key(leaderboardId).Min(strconv.Itoa(int(startRank))).Max(strconv.Itoa(int(endRank)))
+	cmdBuilder := r.client.B().Zrange().Key(leaderboardId).Min(fmt.Sprint(startRank)).Max(fmt.Sprint(endRank))
 
 	var cmd rueidis.Completed
 	if sortOrder == pb.SortOrder_ASCENDING {

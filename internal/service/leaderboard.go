@@ -14,7 +14,7 @@ import (
 )
 
 type leaderboardService struct {
-	pb.LeaderboardServer
+	pb.UnimplementedLeaderboardServer
 
 	repo     repository.Repository
 	redis    redis.Redis

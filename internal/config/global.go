@@ -39,7 +39,7 @@ func LoadGlobalConfig() (config *Config, err error) {
 		return nil, err
 	}
 
-	if err = viper.UnmarshalExact(&config); err != nil {
+	if err = viper.Unmarshal(&config); err != nil {
 		return nil, err
 	}
 

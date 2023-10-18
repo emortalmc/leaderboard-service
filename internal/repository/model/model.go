@@ -7,7 +7,7 @@ import (
 
 type Leaderboard struct {
 	Id        string       `bson:"_id"`
-	SortOrder pb.SortOrder `bson:"sort_order"`
+	SortOrder pb.SortOrder `bson:"sortOrder"`
 }
 
 func (l *Leaderboard) ToProto() *pb.Leaderboard {
@@ -18,7 +18,7 @@ func (l *Leaderboard) ToProto() *pb.Leaderboard {
 }
 
 type LeaderboardEntry struct {
-	LeaderboardId string `bson:"leaderboard_id"`
+	LeaderboardId string `bson:"leaderboardId"`
 
 	Id    string  `bson:"_id"`
 	Score float64 `bson:"score"`

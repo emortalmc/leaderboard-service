@@ -26,7 +26,7 @@ func Run(cfg *config.Config, logger *zap.SugaredLogger) {
 		logger.Fatalw("failed to connect to mongo", err)
 	}
 
-	redis, err := lbRedis.NewRedis(delayedCtx, delayedWg, cfg.Redis, logger)
+	redis, err := lbRedis.NewRedis(delayedCtx, delayedWg, cfg.Redis)
 	if err != nil {
 		logger.Fatalw("failed to connect to redis", err)
 	}
