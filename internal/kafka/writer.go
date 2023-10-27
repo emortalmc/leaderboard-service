@@ -54,35 +54,19 @@ func NewNotifier(ctx context.Context, wg *sync.WaitGroup, cfg *config.KafkaConfi
 }
 
 func (k *kafkaNotifier) LeaderboardCreated(ctx context.Context, leaderboard *pb.Leaderboard) {
-	msg := &lbmsg.LeaderboardCreatedMessage{Leaderboard: leaderboard}
-
-	if err := k.writeMessage(ctx, msg); err != nil {
-		k.logger.Errorw("failed to write leaderboard created message", "err", err)
-	}
+	k.writeMessage(ctx, &lbmsg.LeaderboardCreatedMessage{Leaderboard: leaderboard})
 }
 
 func (k *kafkaNotifier) LeaderboardDeleted(ctx context.Context, leaderboardId string) {
-	msg := &lbmsg.LeaderboardDeletedMessage{LeaderboardId: leaderboardId}
-
-	if err := k.writeMessage(ctx, msg); err != nil {
-		k.logger.Errorw("failed to write leaderboard deleted message", "err", err)
-	}
+	k.writeMessage(ctx, &lbmsg.LeaderboardDeletedMessage{LeaderboardId: leaderboardId})
 }
 
 func (k *kafkaNotifier) EntryCreated(ctx context.Context, entry *pb.LeaderboardEntry) {
-	msg := &lbmsg.EntryCreatedMessage{Entry: entry}
-
-	if err := k.writeMessage(ctx, msg); err != nil {
-		k.logger.Errorw("failed to write entry created message", "err", err)
-	}
+	k.writeMessage(ctx, &lbmsg.EntryCreatedMessage{Entry: entry})
 }
 
 func (k *kafkaNotifier) EntryDeleted(ctx context.Context, entryId string) {
-	msg := &lbmsg.EntryDeletedMessage{EntryId: entryId}
-
-	if err := k.writeMessage(ctx, msg); err != nil {
-		k.logger.Errorw("failed to write entry deleted message", "err", err)
-	}
+	k.writeMessage(ctx, &lbmsg.EntryDeletedMessage{EntryId: entryId})
 }
 
 func (k *kafkaNotifier) ScoreUpdated(ctx context.Context, leaderboardId string, entryId string, oldScore float64, newScore float64, oldRank uint32, newRank uint32) {
@@ -95,19 +79,26 @@ func (k *kafkaNotifier) ScoreUpdated(ctx context.Context, leaderboardId string, 
 		NewRank:       newRank,
 	}
 
-	if err := k.writeMessage(ctx, msg); err != nil {
-		k.logger.Errorw("failed to write score updated message", "err", err)
-	}
+	k.writeMessage(ctx, msg)
 }
 
-func (k *kafkaNotifier) writeMessage(ctx context.Context, msg proto.Message) error {
+func (k *kafkaNotifier) writeMessage(ctx context.Context, msg proto.Message) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	bytes, err := proto.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal proto to bytes: %s", err)
+		k.logger.Errorw("failed to marshal proto to bytes", "err", err)
 	}
 
-	return k.w.WriteMessages(ctx, kafka.Message{
-		Headers: []kafka.Header{{Key: "X-Proto-Type", Value: []byte(msg.ProtoReflect().Descriptor().FullName())}},
+	protoName := msg.ProtoReflect().Descriptor().FullName()
+	err = k.w.WriteMessages(ctx, kafka.Message{
+		Headers: []kafka.Header{{Key: "X-Proto-Type", Value: []byte(protoName)}},
 		Value:   bytes,
 	})
+
+	// The error is handled here as it's always the same basic error format for every message type
+	if err != nil {
+		k.logger.Errorw("failed to write message", "name", protoName, "err", err)
+	}
 }

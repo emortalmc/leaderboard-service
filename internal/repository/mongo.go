@@ -11,8 +11,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"leaderboard-service/internal/config"
 	"leaderboard-service/internal/repository/model"
-	"log"
 	"sync"
+	"time"
 )
 
 const (
@@ -53,7 +53,7 @@ func NewMongoRepository(ctx context.Context, logger *zap.SugaredLogger, wg *sync
 		defer wg.Done()
 		<-ctx.Done()
 		if err := client.Disconnect(ctx); err != nil {
-			logger.Errorw("failed to disconnect from mongo", err)
+			logger.Errorw("failed to disconnect from mongo", "err", err)
 		}
 	}()
 
@@ -62,6 +62,9 @@ func NewMongoRepository(ctx context.Context, logger *zap.SugaredLogger, wg *sync
 
 // hasLeaderboard returns ErrLeaderboardNotFound to improve client usage
 func (m *mongoRepository) hasLeaderboard(ctx context.Context, id string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	count, err := m.leaderboardCollection.CountDocuments(ctx, bson.M{"_id": id})
 	if err != nil {
 		return err
@@ -75,6 +78,9 @@ func (m *mongoRepository) hasLeaderboard(ctx context.Context, id string) error {
 }
 
 func (m *mongoRepository) GetLeaderboard(ctx context.Context, id string) (*model.Leaderboard, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	var leaderboard model.Leaderboard
 
 	err := m.leaderboardCollection.FindOne(ctx, bson.M{"_id": id}).Decode(&leaderboard)
@@ -88,16 +94,20 @@ func (m *mongoRepository) GetLeaderboard(ctx context.Context, id string) (*model
 	return &leaderboard, nil
 }
 
-func (m *mongoRepository) CreateLeaderboard(ctx context.Context, id string, sortOrder pb.SortOrder) (*model.Leaderboard, error) {
+func (m *mongoRepository) CreateLeaderboard(ctx context.Context, values *pb.Leaderboard) (*model.Leaderboard, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	id := values.Id
 	leaderboard := &model.Leaderboard{
 		Id:        id,
-		SortOrder: sortOrder,
+		SortOrder: values.SortOrder,
 	}
 
-	_, err := m.leaderboardCollection.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$setOnInsert": leaderboard}, options.Update().SetUpsert(true))
+	_, err := m.leaderboardCollection.InsertOne(ctx, leaderboard)
 	if err != nil {
-		if mongo.IsDuplicateKeyError(err) {
-			// If it is a duplicate key error, there's already a leaderboard in there, so we don't want to insert a new one
+		if errors.Is(err, mongo.ErrNoDocuments) || mongo.IsDuplicateKeyError(err) {
+			// Don't care if there's already a leaderboard in there, just ignore the error.
 			return leaderboard, nil
 		}
 		return nil, err
@@ -107,6 +117,9 @@ func (m *mongoRepository) CreateLeaderboard(ctx context.Context, id string, sort
 }
 
 func (m *mongoRepository) DeleteLeaderboard(ctx context.Context, id string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	result, err := m.leaderboardCollection.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return err
@@ -120,6 +133,9 @@ func (m *mongoRepository) DeleteLeaderboard(ctx context.Context, id string) erro
 }
 
 func (m *mongoRepository) GetEntries(ctx context.Context, leaderboardId string, entryIds []string) (map[string]*model.LeaderboardEntry, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if err := m.hasLeaderboard(ctx, leaderboardId); err != nil {
 		return nil, err
 	}
@@ -140,11 +156,13 @@ func (m *mongoRepository) GetEntries(ctx context.Context, leaderboardId string, 
 		result[entry.Id] = entry
 	}
 
-	log.Printf("result for get entries (mongo): %+v", result)
 	return result, nil
 }
 
 func (m *mongoRepository) CreateEntry(ctx context.Context, leaderboardId string, entryId string, score float64, data map[string]*anypb.Any) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if err := m.hasLeaderboard(ctx, leaderboardId); err != nil {
 		return err
 	}
@@ -156,24 +174,24 @@ func (m *mongoRepository) CreateEntry(ctx context.Context, leaderboardId string,
 		Data:          data,
 	}
 
-	_, err := m.entryCollection.UpdateOne(ctx, bson.M{"leaderboardId": leaderboardId, "_id": entryId}, bson.M{"$setOnInsert": entry}, options.Update().SetUpsert(true))
-	if mongo.IsDuplicateKeyError(err) {
-		// If it is a duplicate key error, there's already an entry in there, so we don't want to insert a new one
+	_, err := m.entryCollection.InsertOne(ctx, entry)
+	if errors.Is(err, mongo.ErrNoDocuments) || mongo.IsDuplicateKeyError(err) {
+		// Don't care if there's already an entry in there, just ignore the error.
 		return nil
 	}
 	return err
 }
 
 func (m *mongoRepository) DeleteEntry(ctx context.Context, leaderboardId string, entryId string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if err := m.hasLeaderboard(ctx, leaderboardId); err != nil {
 		return err
 	}
 
 	result, err := m.entryCollection.DeleteOne(ctx, bson.M{"leaderboardId": leaderboardId, "_id": entryId})
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return ErrLeaderboardNotFound
-		}
 		return err
 	}
 
@@ -185,6 +203,9 @@ func (m *mongoRepository) DeleteEntry(ctx context.Context, leaderboardId string,
 }
 
 func (m *mongoRepository) UpdateScore(ctx context.Context, leaderboardId string, entryId string, score float64) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if err := m.hasLeaderboard(ctx, leaderboardId); err != nil {
 		return err
 	}

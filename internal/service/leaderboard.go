@@ -10,7 +10,6 @@ import (
 	"leaderboard-service/internal/kafka"
 	"leaderboard-service/internal/redis"
 	"leaderboard-service/internal/repository"
-	"log"
 )
 
 type leaderboardService struct {
@@ -37,7 +36,7 @@ var (
 )
 
 func (s *leaderboardService) CreateLeaderboard(ctx context.Context, req *pb.CreateLeaderboardRequest) (*pb.CreateLeaderboardResponse, error) {
-	leaderboard, err := s.repo.CreateLeaderboard(ctx, req.Id, req.SortOrder)
+	leaderboard, err := s.repo.CreateLeaderboard(ctx, req.Leaderboard)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +96,6 @@ func (s *leaderboardService) GetEntries(ctx context.Context, req *pb.GetEntriesR
 		result[i] = entries[id].ToProto(rank)
 		rank++
 	}
-
-	log.Printf("result for get entries (svc): %+v", result)
 
 	return &pb.GetEntriesResponse{Entries: result}, nil
 }

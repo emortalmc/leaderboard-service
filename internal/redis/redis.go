@@ -7,6 +7,7 @@ import (
 	"github.com/redis/rueidis"
 	"leaderboard-service/internal/config"
 	"sync"
+	"time"
 )
 
 type Redis interface {
@@ -44,21 +45,30 @@ func NewRedis(ctx context.Context, wg *sync.WaitGroup, cfg *config.RedisConfig) 
 }
 
 func (r *redisImpl) CreateOrUpdateEntry(ctx context.Context, leaderboardId string, entryId string, score float64) error {
-	cmd := r.client.B().Zadd().Key(leaderboardId).ScoreMember().ScoreMember(score, entryId).Build()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := r.client.B().Zadd().Key(addPrefix(leaderboardId)).ScoreMember().ScoreMember(score, entryId).Build()
 
 	err := r.client.Do(ctx, cmd).Error()
 	return err
 }
 
 func (r *redisImpl) DeleteEntry(ctx context.Context, leaderboardId string, entryId string) error {
-	cmd := r.client.B().Zrem().Key(leaderboardId).Member(entryId).Build()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := r.client.B().Zrem().Key(addPrefix(leaderboardId)).Member(entryId).Build()
 
 	err := r.client.Do(ctx, cmd).Error()
 	return err
 }
 
 func (r *redisImpl) GetEntriesInRange(ctx context.Context, leaderboardId string, sortOrder pb.SortOrder, startRank uint32, endRank uint32) ([]string, error) {
-	cmdBuilder := r.client.B().Zrange().Key(leaderboardId).Min(fmt.Sprint(startRank)).Max(fmt.Sprint(endRank))
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmdBuilder := r.client.B().Zrange().Key(addPrefix(leaderboardId)).Min(fmt.Sprint(startRank)).Max(fmt.Sprint(endRank))
 
 	var cmd rueidis.Completed
 	if sortOrder == pb.SortOrder_ASCENDING {
@@ -78,14 +88,20 @@ func (r *redisImpl) GetEntriesInRange(ctx context.Context, leaderboardId string,
 }
 
 func (r *redisImpl) GetEntryRank(ctx context.Context, leaderboardId string, entryId string) (uint32, error) {
-	cmd := r.client.B().Zrank().Key(leaderboardId).Member(entryId).Build()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := r.client.B().Zrank().Key(addPrefix(leaderboardId)).Member(entryId).Build()
 
 	res := r.client.Do(ctx, cmd)
 	return convertResultToUint32(res)
 }
 
 func (r *redisImpl) GetEntryCount(ctx context.Context, leaderboardId string) (uint32, error) {
-	cmd := r.client.B().Zcard().Key(leaderboardId).Build()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := r.client.B().Zcard().Key(addPrefix(leaderboardId)).Build()
 
 	res := r.client.Do(ctx, cmd)
 	return convertResultToUint32(res)
@@ -106,7 +122,10 @@ func convertResultToUint32(result rueidis.RedisResult) (uint32, error) {
 }
 
 func (r *redisImpl) GetScore(ctx context.Context, leaderboardId string, entryId string) (float64, error) {
-	cmd := r.client.B().Zscore().Key(leaderboardId).Member(entryId).Build()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := r.client.B().Zscore().Key(addPrefix(leaderboardId)).Member(entryId).Build()
 
 	res, err := r.client.Do(ctx, cmd).AsFloat64()
 	if err != nil {
@@ -114,4 +133,8 @@ func (r *redisImpl) GetScore(ctx context.Context, leaderboardId string, entryId 
 	}
 
 	return res, nil
+}
+
+func addPrefix(key string) string {
+	return fmt.Sprintf("leaderboard:%s", key)
 }

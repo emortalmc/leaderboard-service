@@ -26,15 +26,7 @@ func RunServices(ctx context.Context, logger *zap.SugaredLogger, wg *sync.WaitGr
 		logger.Fatalw("failed to listen", "err", err)
 	}
 
-	s := grpc.NewServer(grpc.ChainUnaryInterceptor(
-		grpczap.UnaryServerInterceptor(logger.Desugar(), grpczap.WithLevels(func(code codes.Code) zapcore.Level {
-			if code != codes.Internal && code != codes.Unavailable && code != codes.Unknown {
-				return zapcore.DebugLevel
-			} else {
-				return zapcore.ErrorLevel
-			}
-		})),
-	))
+	s := grpc.NewServer(createLoggingInterceptor(logger))
 
 	if cfg.Development {
 		reflection.Register(s)
@@ -47,7 +39,7 @@ func RunServices(ctx context.Context, logger *zap.SugaredLogger, wg *sync.WaitGr
 
 	go func() {
 		if err := s.Serve(lis); err != nil {
-			logger.Fatalw("failed to serve", "error", err)
+			logger.Fatalw("failed to serve", "err", err)
 			return
 		}
 	}()
@@ -58,4 +50,16 @@ func RunServices(ctx context.Context, logger *zap.SugaredLogger, wg *sync.WaitGr
 		<-ctx.Done()
 		s.GracefulStop()
 	}()
+}
+
+func createLoggingInterceptor(logger *zap.SugaredLogger) grpc.ServerOption {
+	levelFilter := grpczap.WithLevels(func(code codes.Code) zapcore.Level {
+		if code != codes.Internal && code != codes.Unavailable && code != codes.Unknown {
+			return zapcore.DebugLevel
+		} else {
+			return zapcore.ErrorLevel
+		}
+	})
+
+	return grpc.ChainUnaryInterceptor(grpczap.UnaryServerInterceptor(logger.Desugar(), levelFilter))
 }

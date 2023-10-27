@@ -3,7 +3,7 @@ module leaderboard-service
 go 1.21
 
 require (
-	github.com/emortalmc/proto-specs/gen/go v0.0.0-20231016143814-b9eb1ae2561a
+	github.com/emortalmc/proto-specs/gen/go v0.0.0-20231027135348-9e2ef7ccba49
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/redis/rueidis v1.0.19
 	github.com/segmentio/kafka-go v0.4.39

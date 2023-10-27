@@ -32,9 +32,6 @@ func Run(cfg *config.Config, logger *zap.SugaredLogger) {
 	}
 
 	notifier := kafka.NewNotifier(delayedCtx, delayedWg, cfg.Kafka, logger)
-	if err != nil {
-		logger.Fatalw("failed to create kafka notifier", err)
-	}
 
 	service.RunServices(ctx, logger, wg, cfg, repo, redis, notifier)
 
