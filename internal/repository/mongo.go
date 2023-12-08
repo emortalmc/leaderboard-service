@@ -120,16 +120,8 @@ func (m *mongoRepository) DeleteLeaderboard(ctx context.Context, id string) erro
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	result, err := m.leaderboardCollection.DeleteOne(ctx, bson.M{"_id": id})
-	if err != nil {
-		return err
-	}
-
-	if result.DeletedCount == 0 {
-		return ErrLeaderboardNotFound
-	}
-
-	return nil
+	_, err := m.leaderboardCollection.DeleteOne(ctx, bson.M{"_id": id})
+	return err
 }
 
 func (m *mongoRepository) GetEntries(ctx context.Context, leaderboardId string, entryIds []string) (map[string]*model.LeaderboardEntry, error) {
@@ -190,16 +182,8 @@ func (m *mongoRepository) DeleteEntry(ctx context.Context, leaderboardId string,
 		return err
 	}
 
-	result, err := m.entryCollection.DeleteOne(ctx, bson.M{"leaderboardId": leaderboardId, "_id": entryId})
-	if err != nil {
-		return err
-	}
-
-	if result.DeletedCount == 0 {
-		return ErrEntryNotFound
-	}
-
-	return nil
+	_, err := m.entryCollection.DeleteOne(ctx, bson.M{"leaderboardId": leaderboardId, "_id": entryId})
+	return err
 }
 
 func (m *mongoRepository) UpdateScore(ctx context.Context, leaderboardId string, entryId string, score float64) error {
@@ -210,10 +194,6 @@ func (m *mongoRepository) UpdateScore(ctx context.Context, leaderboardId string,
 		return err
 	}
 
-	res, err := m.entryCollection.UpdateOne(ctx, bson.M{"leaderboardId": leaderboardId, "_id": entryId}, bson.M{"$set": bson.M{"score": score}})
-	if res.MatchedCount == 0 {
-		return ErrEntryNotFound
-	}
-
+	_, err := m.entryCollection.UpdateOne(ctx, bson.M{"leaderboardId": leaderboardId, "_id": entryId}, bson.M{"$set": bson.M{"score": score}})
 	return err
 }
